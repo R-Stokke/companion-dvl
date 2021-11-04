@@ -49,8 +49,12 @@ class DvlDriver (threading.Thread):
             time.sleep(1)
 
     def vehicle_armed(self):
-        base_mode = json.loads(self.mav.get("/HEARTBEAT"))['base_mode']['bits']
-
+        try:
+            base_mode = json.loads(self.mav.get("/HEARTBEAT"))['base_mode']['bits']
+        except Exception as error:
+            print(error)
+            time.sleep(0.1)
+            
         if base_mode == 81:
             return False
         elif base_mode == 89:
