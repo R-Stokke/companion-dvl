@@ -3,8 +3,11 @@ FROM python:3.9-slim-buster
 # Create default user folder
 RUN mkdir -p /home/pi
 
-# Install gstreamer
-COPY dvl-a50 /home/pi/dvl-a50
-RUN cd /home/pi/dvl-a50 && pip3 install .
+COPY cerulean /home/pi/cerulean
+RUN apt-get update && apt-get install -y git
 
-ENTRYPOINT /home/pi/dvl-a50/main.py
+RUN cd /home/pi/dvl-a50 && pip3 install .  
+RUN pip3 install pyserial git+https://github.com/CeruleanSonar/pynmea2
+
+#ENTRYPOINT /home/pi/dvl-a50/main.py
+ENTRYPOINT /home/pi/cerulean/main.py
