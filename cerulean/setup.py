@@ -13,4 +13,4 @@ setup(name='cerulean_dvl_service',
       version='0.1.0',
       description='Cerulean DVL service',
       license='MIT',
-      install_requires=['Flask == 1.0.3','MarkupSafe == 0.23','itsdangerous == 0.24','Jinja2 == 2.10', 'click == 7.1.2'])
+      install_requires=['Flask == 1.0.3','MarkupSafe == 0.23','itsdangerous == 0.24','Jinja2 == 2.10', 'click == 7.1.2', 'requests'])
