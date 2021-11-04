@@ -3,7 +3,7 @@ import requests
 import json
 
 STATUS_REPORT_URL = "http://127.0.0.1:2770/report_service_status"
-MAVLINK2REST_URL = "http://192.168.2.2:4777"
+MAVLINK2REST_URL = "http://192.168.2.2:6040"
 
 # holds the last status so we dont flood it
 last_status = ""
