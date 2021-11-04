@@ -1,9 +1,10 @@
 from companionhelper import request, post
 import requests
 import json
+import time
+from math import radians
 
-STATUS_REPORT_URL = "http://127.0.0.1:2770/report_service_status"
-MAVLINK2REST_URL = "http://192.168.2.2:6040"
+MAVLINK2REST_URL = "http://127.0.0.1/mavlink2rest"
 
 # holds the last status so we dont flood it
 last_status = ""
@@ -16,6 +17,7 @@ class Mavlink2RestHelper:
 
     def __init__(self):
         # store vision template data so we don't need to fetch it multiple times
+        self.start_time = time.time()
         self.vision_template = """
 {{
   "header": {{
@@ -41,6 +43,77 @@ class Mavlink2RestHelper:
   }}
 }}"""
 
+        self.vision_speed_estimate_template = """
+        {{
+  "header": {{
+    "system_id": 255,
+    "component_id": 0,
+    "sequence": 0
+  }},
+  "message": {{
+    "type": "VISION_SPEED_ESTIMATE",
+    "usec": {us},
+    "x": {vx},
+    "y": {vy},
+    "z": {vz},
+    "covariance": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "reset_counter": 0
+  }}
+}}"""
+
+        self.vision_position_estimate_template = """
+{{
+  "header": {{
+    "system_id": 255,
+    "component_id": 0,
+    "sequence": 0
+  }},
+  "message": {{
+    "type": "VISION_POSITION_ESTIMATE",
+    "usec": {us},
+    "x": {x},
+    "y": {y},
+    "z": {z},
+    "roll": {roll},
+    "pitch": {pitch},
+    "yaw": {yaw},
+    "covariance": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "reset_counter": 0
+  }}
+}}"""
+
         self.gps_origin_template = """
 {{
   "header": {{
@@ -60,7 +133,7 @@ class Mavlink2RestHelper:
         """
 
         self.rangefinder_template = """
-        {{
+{{
   "header": {{
     "system_id": 255,
     "component_id": 0,
@@ -69,7 +142,7 @@ class Mavlink2RestHelper:
   "message": {{
     "type": "DISTANCE_SENSOR",
     "time_boot_ms": 0,
-    "min_distance": 5,
+    "min_distance": 0,
     "max_distance": 5000,
     "current_distance": {0},
     "mavtype": {{
@@ -87,7 +160,8 @@ class Mavlink2RestHelper:
       0.0,
       0.0,
       0.0
-    ]
+    ],
+    "signal_quality": 0
   }}
 }}
 """
@@ -118,7 +192,10 @@ class Mavlink2RestHelper:
         """
         Returns the frequency at which message "message_name" is being received, 0 if unavailable
         """
-        return self.get_float('/{0}/message_information/frequency'.format(message_name))
+        try:
+          return self.get_float('/{0}/message_information/frequency'.format(message_name))
+        except ValueError:
+          return 0
 
     # TODO: Find a way to run this check for every message received without overhead
     # check https://github.com/patrickelectric/mavlink2rest/issues/9
@@ -134,14 +211,14 @@ class Mavlink2RestHelper:
         # load message template from mavlink2rest helper
         try:
             data = json.loads(requests.get(
-                MAVLINK2REST_URL + '/helper/message/COMMAND_LONG').text)
+                MAVLINK2REST_URL + '/helper/mavlink?name=COMMAND_LONG').text)
         except:
             return False
 
         # msg_id = getattr(mavutil.mavlink, 'MAVLINK_MSG_ID_' + message_name)
         data["message"]["command"] = {"type": 'MAV_CMD_SET_MESSAGE_INTERVAL'}
         data["message"]["param1"] = msg_id
-        data["message"]["param2"] = int(1000/frequency)
+        data["message"]["param2"] = int(1000000/frequency)
 
         try:
             result = requests.post(MAVLINK2REST_URL + '/mavlink', json=data)
@@ -157,7 +234,7 @@ class Mavlink2RestHelper:
         """
         try:
             data = json.loads(requests.get(
-                MAVLINK2REST_URL + '/helper/message/PARAM_SET').text)
+                MAVLINK2REST_URL + '/helper/mavlink?name=PARAM_SET').text)
 
             for i, char in enumerate(param_name):
                 data["message"]["param_id"][i] = char
@@ -184,15 +261,38 @@ class Mavlink2RestHelper:
 
         post(MAVLINK2REST_URL + '/mavlink', data=data)
 
+    def send_vision_speed_estimate(self, speed_estimates):
+        "Sends message VISION_SPEED_ESTIMATE to flight controller"
+        data = self.vision_speed_estimate_template.format(
+                                  us=int((time.time()-self.start_time)*1e6),
+                                  vx=speed_estimates[0],
+                                  vy=speed_estimates[1],
+                                  vz=speed_estimates[2])
+
+        post(MAVLINK2REST_URL + '/mavlink', data=data)
+
+    def send_vision_position_estimate(self, timestamp, position_estimates, attitude_estimates=[0.0, 0.0, 0.0]):
+        "Sends message VISION_POSITION_ESTIMATE to flight controller"
+        data = self.vision_position_estimate_template.format(
+                                  us=int(timestamp*1e3),
+                                  roll=radians(attitude_estimates[0]),
+                                  pitch=radians(attitude_estimates[1]),
+                                  yaw=radians(attitude_estimates[2]),
+                                  x=position_estimates[0],
+                                  y=position_estimates[1],
+                                  z=position_estimates[2])
+        post(MAVLINK2REST_URL + '/mavlink', data=data)
+
     def send_rangefinder(self, distance: float):
         "Sends message DISTANCE_SENSOR to flight controller"
+        if distance == -1:
+            return
         data = self.rangefinder_template.format(int(distance*100))
 
         post(MAVLINK2REST_URL + '/mavlink', data=data)
 
     def set_gps_origin(self, lat, lon):
         data = self.gps_origin_template.format(lat=int(float(lat)*1e7), lon=int(float(lon)*1e7))
-        print(data)
         post(MAVLINK2REST_URL + '/mavlink', data=data)
 
     def get_orientation(self):
