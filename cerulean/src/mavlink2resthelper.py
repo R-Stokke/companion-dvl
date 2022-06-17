@@ -5,6 +5,7 @@ import time
 from math import radians
 
 MAVLINK2REST_URL = "http://127.0.0.1/mavlink2rest"
+PATH_PREFIX = "/vehicles/1/components/1/messages"
 
 # holds the last status so we dont flood it
 last_status = ""
@@ -183,7 +184,7 @@ class Mavlink2RestHelper:
         Example: get('/VFR_HUD')
         Returns the data as text or False on failure
         """
-        response = request(MAVLINK2REST_URL + '/mavlink' + path)
+        response = request(MAVLINK2REST_URL + '/mavlink' + PATH_PREFIX + path)
         if not response:
             return False
         return response
@@ -258,8 +259,11 @@ class Mavlink2RestHelper:
                                            dy=position_deltas[1],
                                            dz=position_deltas[2],
                                            confidence=confidence)
-
-        post(MAVLINK2REST_URL + '/mavlink', data=data)
+        print("Posting VISO")
+        try:
+             post(MAVLINK2REST_URL + '/mavlink', data=data)
+        except:
+             print("failed to post")
 
     def send_vision_speed_estimate(self, speed_estimates):
         "Sends message VISION_SPEED_ESTIMATE to flight controller"

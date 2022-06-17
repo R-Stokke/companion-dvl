@@ -50,7 +50,7 @@ class DvlDriver (threading.Thread):
 
     def vehicle_armed(self):
         try:
-            base_mode = json.loads(self.mav.get("/HEARTBEAT"))['base_mode']['bits']
+            base_mode = json.loads(self.mav.get("/HEARTBEAT"))['message']['base_mode']['bits']
         except Exception as error:
             print(error)
             time.sleep(0.1)
@@ -109,6 +109,7 @@ class DvlDriver (threading.Thread):
         return False
 
     def setup_socket(self, timeout=300):
+        print("Trying to connect to socket")
         """
         Sets up the socket to talk to the DVL
         """
@@ -118,8 +119,10 @@ class DvlDriver (threading.Thread):
                 self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 self.socket.setblocking(False)
                 self.socket.bind(('0.0.0.0', 27000))
+                print("Success")
                 return True
             except socket.error:
+                print("Connection error")
                 time.sleep(0.1)
             except Exception as error:
                 print(error)
@@ -223,7 +226,6 @@ class DvlDriver (threading.Thread):
                     # feeding back the angles seem to aggravate the gyro drift issue
                     # angles = self.update_attitude()
                     angles = [0, 0, 0]
-
                     if self.current_orientation == DVL_DOWN and c >= 70:
                         self.mav.send_vision([dx, dy, dz],
                                             angles,
